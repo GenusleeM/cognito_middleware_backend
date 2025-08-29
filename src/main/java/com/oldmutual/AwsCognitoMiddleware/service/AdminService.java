@@ -16,6 +16,8 @@ import java.util.stream.Collectors;
 
 /**
  * Service for admin operations related to app configuration management.
+ * 
+ * @author Genuslee Mapedze
  */
 @Slf4j
 @Service
@@ -31,6 +33,7 @@ public class AdminService {
      */
     @Transactional(readOnly = true)
     public List<AppConfigResponse> getAllApps() {
+        log.info("Retrieving all app configurations");
         return appConfigRepository.findAll().stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());

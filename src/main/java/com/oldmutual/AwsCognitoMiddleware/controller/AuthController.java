@@ -33,6 +33,8 @@ import java.util.Map;
 /**
  * Controller for authentication endpoints.
  * All endpoints require the X-APP-KEY header to be present.
+ * 
+ * @author Genuslee Mapedze
  */
 @Slf4j
 @RestController
@@ -50,6 +52,7 @@ public class AuthController {
      */
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<Map<String, Object>>> register(@Valid @RequestBody RegisterRequest request) {
+        log.info("Received registration request for email: {}", request.getEmail());
         try {
             // Pass email, password, and custom attributes to the service
             SignUpResponse response = cognitoService.registerUser(
@@ -99,6 +102,7 @@ public class AuthController {
      */
     @PostMapping("/verify")
     public ResponseEntity<ApiResponse<Map<String, Object>>> verify(@Valid @RequestBody VerifyRequest request) {
+        log.info("Received verification request for email: {}", request.getEmail());
         try {
             ConfirmSignUpResponse response = cognitoService.verifyUser(request.getEmail(), request.getConfirmationCode());
             
@@ -141,6 +145,7 @@ public class AuthController {
      */
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<Map<String, Object>>> login(@Valid @RequestBody LoginRequest request) {
+        log.info("Received login request for email: {}", request.getEmail());
         try {
             InitiateAuthResponse response = cognitoService.authenticateUser(request.getEmail(), request.getPassword());
             
@@ -194,6 +199,7 @@ public class AuthController {
      */
     @PostMapping("/forgot-password")
     public ResponseEntity<ApiResponse<Map<String, Object>>> forgotPassword(@Valid @RequestBody ForgotPasswordDto request) {
+        log.info("Received forgot password request for email: {}", request.getEmail());
         try {
             ForgotPasswordResponse response = cognitoService.forgotPassword(request.getEmail());
             
@@ -239,6 +245,7 @@ public class AuthController {
      */
     @PostMapping("/confirm-forgot-password")
     public ResponseEntity<ApiResponse<Map<String, Object>>> confirmForgotPassword(@Valid @RequestBody ConfirmForgotPasswordDto request) {
+        log.info("Received confirm forgot password request for email: {}", request.getEmail());
         try {
             ConfirmForgotPasswordResponse response = cognitoService.confirmForgotPassword(
                 request.getEmail(), 

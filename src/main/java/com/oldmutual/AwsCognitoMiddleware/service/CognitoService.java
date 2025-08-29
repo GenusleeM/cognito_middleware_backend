@@ -18,6 +18,8 @@ import java.util.Map;
 /**
  * Service for AWS Cognito operations.
  * Dynamically creates Cognito clients based on the configuration from the request.
+ * 
+ * @author Genuslee Mapedze
  */
 @Slf4j
 @Service
@@ -74,7 +76,9 @@ public class CognitoService {
      * @return The result of the registration
      */
     public SignUpResponse registerUser(String email, String password, Map<String, String> attributes) {
+        log.info("Registering new user with email: {}", email);
         CognitoAppConfig appConfig = getCurrentAppConfig();
+        log.debug("Using app config: {}", appConfig.getAppName());
         CognitoIdentityProviderClient cognitoClient = createCognitoClient();
         
         try {
@@ -123,7 +127,9 @@ public class CognitoService {
      * @return The result of the verification
      */
     public ConfirmSignUpResponse verifyUser(String email, String confirmationCode) {
+        log.info("Verifying user with email: {}", email);
         CognitoAppConfig appConfig = getCurrentAppConfig();
+        log.debug("Using app config: {}", appConfig.getAppName());
         CognitoIdentityProviderClient cognitoClient = createCognitoClient();
         
         try {
@@ -147,7 +153,9 @@ public class CognitoService {
      * @return The authentication result
      */
     public InitiateAuthResponse authenticateUser(String email, String password) {
+        log.info("Authenticating user with email: {}", email);
         CognitoAppConfig appConfig = getCurrentAppConfig();
+        log.debug("Using app config: {}", appConfig.getAppName());
         CognitoIdentityProviderClient cognitoClient = createCognitoClient();
         
         try {
@@ -174,7 +182,9 @@ public class CognitoService {
      * @return The result of the forgot password request
      */
     public ForgotPasswordResponse forgotPassword(String email) {
+        log.info("Initiating forgot password process for user with email: {}", email);
         CognitoAppConfig appConfig = getCurrentAppConfig();
+        log.debug("Using app config: {}", appConfig.getAppName());
         CognitoIdentityProviderClient cognitoClient = createCognitoClient();
         
         try {
@@ -198,7 +208,9 @@ public class CognitoService {
      * @return The result of the confirmation
      */
     public ConfirmForgotPasswordResponse confirmForgotPassword(String email, String confirmationCode, String newPassword) {
+        log.info("Confirming forgot password for user with email: {}", email);
         CognitoAppConfig appConfig = getCurrentAppConfig();
+        log.debug("Using app config: {}", appConfig.getAppName());
         CognitoIdentityProviderClient cognitoClient = createCognitoClient();
         
         try {

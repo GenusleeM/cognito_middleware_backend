@@ -18,6 +18,8 @@ import java.util.UUID;
 
 /**
  * Controller for admin operations related to app configuration management.
+ * 
+ * @author Genuslee Mapedze
  */
 @Slf4j
 @RestController
@@ -34,6 +36,7 @@ public class AdminController {
      */
     @GetMapping
     public ResponseEntity<ApiResponse<List<AppConfigResponse>>> getAllApps() {
+        log.info("Received request to get all app configurations");
         List<AppConfigResponse> apps = adminService.getAllApps();
         return ResponseEntity.ok(ApiResponse.success(apps, "App configurations retrieved successfully"));
     }
@@ -46,6 +49,7 @@ public class AdminController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<AppConfigResponse>> getAppById(@PathVariable Long id) {
+        log.info("Received request to get app configuration with ID: {}", id);
         AppConfigResponse app = adminService.getAppById(id);
         return ResponseEntity.ok(ApiResponse.success(app, "App configuration retrieved successfully"));
     }
@@ -58,6 +62,7 @@ public class AdminController {
      */
     @PostMapping
     public ResponseEntity<ApiResponse<AppConfigResponse>> createApp(@Valid @RequestBody AppConfigRequest request) {
+        log.info("Received request to create new app configuration with name: {}", request.getAppName());
         AppConfigResponse createdApp = adminService.createApp(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(createdApp, "App configuration created successfully"));
@@ -74,6 +79,7 @@ public class AdminController {
     public ResponseEntity<ApiResponse<AppConfigResponse>> updateApp(
             @PathVariable Long id,
             @Valid @RequestBody AppConfigRequest request) {
+        log.info("Received request to update app configuration with ID: {}", id);
         AppConfigResponse updatedApp = adminService.updateApp(id, request);
         return ResponseEntity.ok(ApiResponse.success(updatedApp, "App configuration updated successfully"));
     }
@@ -86,6 +92,7 @@ public class AdminController {
      */
     @PutMapping("/{id}/enable")
     public ResponseEntity<ApiResponse<Void>> enableApp(@PathVariable Long id) {
+        log.info("Received request to enable app configuration with ID: {}", id);
         adminService.enableApp(id);
         return ResponseEntity.ok(ApiResponse.success("App enabled successfully"));
     }
@@ -98,6 +105,7 @@ public class AdminController {
      */
     @PutMapping("/{id}/disable")
     public ResponseEntity<ApiResponse<Void>> disableApp(@PathVariable Long id) {
+        log.info("Received request to disable app configuration with ID: {}", id);
         adminService.disableApp(id);
         return ResponseEntity.ok(ApiResponse.success("App disabled successfully"));
     }
@@ -110,6 +118,7 @@ public class AdminController {
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteApp(@PathVariable Long id) {
+        log.info("Received request to delete app configuration with ID: {}", id);
         adminService.deleteApp(id);
         return ResponseEntity.ok(ApiResponse.success("App configuration deleted successfully"));
     }
