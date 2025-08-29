@@ -148,7 +148,11 @@ public class AdminService {
         appConfig.setAwsRegion(request.getAwsRegion());
         appConfig.setUserPoolId(request.getUserPoolId());
         appConfig.setClientId(request.getClientId());
-        appConfig.setClientSecret(request.getClientSecret());
+        
+        // Only set client secret if it's provided (it's optional)
+        if (request.getClientSecret() != null && !request.getClientSecret().isEmpty()) {
+            appConfig.setClientSecret(request.getClientSecret());
+        }
     }
 
     /**

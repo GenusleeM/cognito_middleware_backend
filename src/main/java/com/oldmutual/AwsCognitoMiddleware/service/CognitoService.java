@@ -25,7 +25,7 @@ import java.util.Map;
 public class CognitoService {
 
     private static final String APP_CONFIG_ATTRIBUTE = "appConfig";
-    private static final String AUTH_FLOW = "ADMIN_USER_PASSWORD_AUTH";
+    private static final String AUTH_FLOW = "USER_PASSWORD_AUTH";
 
     /**
      * Get the current request's Cognito configuration.
@@ -73,7 +73,7 @@ public class CognitoService {
      * @param attributes Map of custom attributes for the user
      * @return The result of the registration
      */
-    public AdminCreateUserResponse registerUser(String email, String password, Map<String, String> attributes) {
+    public SignUpResponse registerUser(String email, String password, Map<String, String> attributes) {
         CognitoAppConfig appConfig = getCurrentAppConfig();
         CognitoIdentityProviderClient cognitoClient = createCognitoClient();
         
@@ -85,11 +85,6 @@ public class CognitoService {
             userAttributes.add(AttributeType.builder()
                     .name("email")
                     .value(email)
-                    .build());
-            
-            userAttributes.add(AttributeType.builder()
-                    .name("email_verified")
-                    .value("true")
                     .build());
             
             // Add custom attributes if provided
@@ -104,28 +99,17 @@ public class CognitoService {
                 }
             }
             
-            // Create the user
-            AdminCreateUserRequest createUserRequest = AdminCreateUserRequest.builder()
-                    .userPoolId(appConfig.getUserPoolId())
-                    .username(email)
-                    .temporaryPassword(password)
-                    .userAttributes(userAttributes)
-                    .messageAction(MessageActionType.SUPPRESS) // Don't send welcome email
-                    .build();
-            
-            AdminCreateUserResponse createUserResponse = cognitoClient.adminCreateUser(createUserRequest);
-            
-            // Set the permanent password
-            AdminSetUserPasswordRequest setPasswordRequest = AdminSetUserPasswordRequest.builder()
-                    .userPoolId(appConfig.getUserPoolId())
+            // Create the user using SignUp instead of AdminCreateUser
+            SignUpRequest signUpRequest = SignUpRequest.builder()
+                    .clientId(appConfig.getClientId())
                     .username(email)
                     .password(password)
-                    .permanent(true)
+                    .userAttributes(userAttributes)
                     .build();
             
-            cognitoClient.adminSetUserPassword(setPasswordRequest);
-            
-            return createUserResponse;
+             var  me = cognitoClient.signUp(signUpRequest);
+             log.info(me.toString());
+             return me;
         } finally {
             cognitoClient.close();
         }
@@ -162,7 +146,7 @@ public class CognitoService {
      * @param password The user's password
      * @return The authentication result
      */
-    public AdminInitiateAuthResponse authenticateUser(String email, String password) {
+    public InitiateAuthResponse authenticateUser(String email, String password) {
         CognitoAppConfig appConfig = getCurrentAppConfig();
         CognitoIdentityProviderClient cognitoClient = createCognitoClient();
         
@@ -171,14 +155,13 @@ public class CognitoService {
             authParams.put("USERNAME", email);
             authParams.put("PASSWORD", password);
             
-            AdminInitiateAuthRequest authRequest = AdminInitiateAuthRequest.builder()
+            InitiateAuthRequest authRequest = InitiateAuthRequest.builder()
                     .authFlow(AUTH_FLOW)
                     .clientId(appConfig.getClientId())
-                    .userPoolId(appConfig.getUserPoolId())
                     .authParameters(authParams)
                     .build();
             
-            return cognitoClient.adminInitiateAuth(authRequest);
+            return cognitoClient.initiateAuth(authRequest);
         } finally {
             cognitoClient.close();
         }

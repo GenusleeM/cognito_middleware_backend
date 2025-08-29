@@ -15,11 +15,14 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminCreateUserResponse;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminInitiateAuthResponse;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.*;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.SignUpResponse;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.InitiateAuthResponse;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AuthenticationResultType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.CodeMismatchException;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.ConfirmSignUpResponse;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.ForgotPasswordResponse;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.ConfirmForgotPasswordResponse;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.NotAuthorizedException;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UserNotFoundException;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UsernameExistsException;
@@ -46,35 +49,45 @@ public class AuthController {
      * @return The registration response
      */
     @PostMapping("/register")
-    public ResponseEntity<ApiResponse<Map<String, String>>> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> register(@Valid @RequestBody RegisterRequest request) {
         try {
             // Pass email, password, and custom attributes to the service
-            AdminCreateUserResponse response = cognitoService.registerUser(
+            SignUpResponse response = cognitoService.registerUser(
                 request.getEmail(), 
                 request.getPassword(),
                 request.getAttributes()
             );
             
-            Map<String, String> data = new HashMap<>();
-            data.put("username", response.user().username());
-            data.put("status", response.user().userStatusAsString());
-            
-            return ResponseEntity.ok(ApiResponse.success(data, "User registered successfully"));
+            Map<String, Object> data = new HashMap<>();
+            data.put("username", response.userSub());
+            data.put("status", "UNCONFIRMED"); // User needs to verify email
+            data.put("userConfirmationNecessary", "true");
+
+            return ResponseEntity.ok(ApiResponse.success(data, "User registered successfully. Please check your email for verification code"));
         } catch (UsernameExistsException e) {
             log.error("Username already exists: {}", request.getEmail(), e);
-            return ResponseEntity.badRequest().body(ApiResponse.error("User with this email already exists"));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "UsernameExistsException");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("User with this email already exists", errorData));
         } catch (IllegalStateException e) {
             log.error("Configuration error: {}", e.getMessage(), e);
-            return ResponseEntity.badRequest().body(ApiResponse.error("Configuration error: " + e.getMessage()));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "ConfigurationError");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("Configuration error: " + e.getMessage(), errorData));
         } catch (software.amazon.awssdk.core.exception.SdkClientException e) {
             log.error("AWS SDK client error: {}", e.getMessage(), e);
-            Map<String, String> errorDetails = new HashMap<>();
-            errorDetails.put("errorType", "AwsCredentialsError");
-            errorDetails.put("errorMessage", e.getMessage());
-            return ResponseEntity.badRequest().body(ApiResponse.error("AWS credentials error. Please contact support.", errorDetails));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "AwsCredentialsError");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("AWS credentials error. Please contact support.", errorData));
         } catch (Exception e) {
             log.error("Error registering user: {}", request.getEmail(), e);
-            return ResponseEntity.badRequest().body(ApiResponse.error("Error registering user: " + e.getMessage()));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "UnexpectedException");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("Error registering user: " + e.getMessage(), errorData));
         }
     }
 
@@ -85,22 +98,38 @@ public class AuthController {
      * @return The verification response
      */
     @PostMapping("/verify")
-    public ResponseEntity<ApiResponse<Void>> verify(@Valid @RequestBody VerifyRequest request) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> verify(@Valid @RequestBody VerifyRequest request) {
         try {
-            cognitoService.verifyUser(request.getEmail(), request.getConfirmationCode());
-            return ResponseEntity.ok(ApiResponse.success("User verified successfully"));
+            ConfirmSignUpResponse response = cognitoService.verifyUser(request.getEmail(), request.getConfirmationCode());
+            
+            Map<String, Object> data = new HashMap<>();
+            data.put("status", "CONFIRMED");
+
+            return ResponseEntity.ok(ApiResponse.success(data, "User verified successfully"));
         } catch (CodeMismatchException e) {
             log.error("Invalid confirmation code for user: {}", request.getEmail(), e);
-            return ResponseEntity.badRequest().body(ApiResponse.error("Invalid confirmation code"));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "CodeMismatchException");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("Invalid confirmation code", errorData));
         } catch (IllegalStateException e) {
             log.error("Configuration error: {}", e.getMessage(), e);
-            return ResponseEntity.badRequest().body(ApiResponse.error("Configuration error: " + e.getMessage()));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "ConfigurationError");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("Configuration error: " + e.getMessage(), errorData));
         } catch (software.amazon.awssdk.core.exception.SdkClientException e) {
             log.error("AWS SDK client error: {}", e.getMessage(), e);
-            return ResponseEntity.badRequest().body(ApiResponse.error("AWS credentials error. Please contact support."));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "AwsCredentialsError");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("AWS credentials error. Please contact support.", errorData));
         } catch (Exception e) {
             log.error("Error verifying user: {}", request.getEmail(), e);
-            return ResponseEntity.badRequest().body(ApiResponse.error("Error verifying user: " + e.getMessage()));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "UnexpectedException");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("Error verifying user: " + e.getMessage(), errorData));
         }
     }
 
@@ -111,37 +140,49 @@ public class AuthController {
      * @return The authentication response with tokens
      */
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<Map<String, String>>> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> login(@Valid @RequestBody LoginRequest request) {
         try {
-            AdminInitiateAuthResponse response = cognitoService.authenticateUser(request.getEmail(), request.getPassword());
+            InitiateAuthResponse response = cognitoService.authenticateUser(request.getEmail(), request.getPassword());
             
-            Map<String, String> tokens = new HashMap<>();
+            Map<String, Object> data = new HashMap<>();
             AuthenticationResultType authResult = response.authenticationResult();
             
-            tokens.put("accessToken", authResult.accessToken());
-            tokens.put("refreshToken", authResult.refreshToken());
-            tokens.put("idToken", authResult.idToken());
-            tokens.put("expiresIn", String.valueOf(authResult.expiresIn()));
-            
-            return ResponseEntity.ok(ApiResponse.success(tokens, "Login successful"));
+            data.put("accessToken", authResult.accessToken());
+            data.put("refreshToken", authResult.refreshToken());
+            data.put("idToken", authResult.idToken());
+            data.put("expiresIn", String.valueOf(authResult.expiresIn()));
+
+            return ResponseEntity.ok(ApiResponse.success(data, "Login successful"));
         } catch (NotAuthorizedException e) {
             log.error("Invalid credentials for user: {}", request.getEmail(), e);
-            return ResponseEntity.badRequest().body(ApiResponse.error("Invalid credentials"));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "NotAuthorizedException");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("Invalid credentials", errorData));
         } catch (UserNotFoundException e) {
             log.error("User not found: {}", request.getEmail(), e);
-            return ResponseEntity.badRequest().body(ApiResponse.error("User not found"));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "UserNotFoundException");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("User not found", errorData));
         } catch (IllegalStateException e) {
             log.error("Configuration error: {}", e.getMessage(), e);
-            return ResponseEntity.badRequest().body(ApiResponse.error("Configuration error: " + e.getMessage()));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "ConfigurationError");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("Configuration error: " + e.getMessage(), errorData));
         } catch (software.amazon.awssdk.core.exception.SdkClientException e) {
             log.error("AWS SDK client error: {}", e.getMessage(), e);
-            Map<String, String> errorDetails = new HashMap<>();
-            errorDetails.put("errorType", "AwsCredentialsError");
-            errorDetails.put("errorMessage", e.getMessage());
-            return ResponseEntity.badRequest().body(ApiResponse.error("AWS credentials error. Please contact support.", errorDetails));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "AwsCredentialsError");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("AWS credentials error. Please contact support.", errorData));
         } catch (Exception e) {
             log.error("Error authenticating user: {}", request.getEmail(), e);
-            return ResponseEntity.badRequest().body(ApiResponse.error("Error authenticating user: " + e.getMessage()));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "UnexpectedException");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("Error authenticating user: " + e.getMessage(), errorData));
         }
     }
 
@@ -152,22 +193,41 @@ public class AuthController {
      * @return The forgot password response
      */
     @PostMapping("/forgot-password")
-    public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordDto request) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> forgotPassword(@Valid @RequestBody ForgotPasswordDto request) {
         try {
-            cognitoService.forgotPassword(request.getEmail());
-            return ResponseEntity.ok(ApiResponse.success("Password reset code sent to email"));
+            ForgotPasswordResponse response = cognitoService.forgotPassword(request.getEmail());
+            
+            Map<String, Object> data = new HashMap<>();
+            if (response.codeDeliveryDetails() != null) {
+                data.put("deliveryMedium", response.codeDeliveryDetails().deliveryMediumAsString());
+                data.put("destination", response.codeDeliveryDetails().destination());
+            }
+
+            return ResponseEntity.ok(ApiResponse.success(data, "Password reset code sent to email"));
         } catch (UserNotFoundException e) {
             log.error("User not found: {}", request.getEmail(), e);
-            return ResponseEntity.badRequest().body(ApiResponse.error("User not found"));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "UserNotFoundException");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("User not found", errorData));
         } catch (IllegalStateException e) {
             log.error("Configuration error: {}", e.getMessage(), e);
-            return ResponseEntity.badRequest().body(ApiResponse.error("Configuration error: " + e.getMessage()));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "ConfigurationError");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("Configuration error: " + e.getMessage(), errorData));
         } catch (software.amazon.awssdk.core.exception.SdkClientException e) {
             log.error("AWS SDK client error: {}", e.getMessage(), e);
-            return ResponseEntity.badRequest().body(ApiResponse.error("AWS credentials error. Please contact support."));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "AwsCredentialsError");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("AWS credentials error. Please contact support.", errorData));
         } catch (Exception e) {
             log.error("Error initiating forgot password: {}", request.getEmail(), e);
-            return ResponseEntity.badRequest().body(ApiResponse.error("Error initiating forgot password: " + e.getMessage()));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "UnexpectedException");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("Error initiating forgot password: " + e.getMessage(), errorData));
         }
     }
 
@@ -178,25 +238,47 @@ public class AuthController {
      * @return The confirm forgot password response
      */
     @PostMapping("/confirm-forgot-password")
-    public ResponseEntity<ApiResponse<Void>> confirmForgotPassword(@Valid @RequestBody ConfirmForgotPasswordDto request) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> confirmForgotPassword(@Valid @RequestBody ConfirmForgotPasswordDto request) {
         try {
-            cognitoService.confirmForgotPassword(request.getEmail(), request.getConfirmationCode(), request.getNewPassword());
-            return ResponseEntity.ok(ApiResponse.success("Password reset successful"));
+            ConfirmForgotPasswordResponse response = cognitoService.confirmForgotPassword(
+                request.getEmail(), 
+                request.getConfirmationCode(), 
+                request.getNewPassword()
+            );
+            
+            Map<String, Object> data = new HashMap<>();
+
+            return ResponseEntity.ok(ApiResponse.success(data, "Password reset successful"));
         } catch (CodeMismatchException e) {
             log.error("Invalid confirmation code for user: {}", request.getEmail(), e);
-            return ResponseEntity.badRequest().body(ApiResponse.error("Invalid confirmation code"));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "CodeMismatchException");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("Invalid confirmation code", errorData));
         } catch (UserNotFoundException e) {
             log.error("User not found: {}", request.getEmail(), e);
-            return ResponseEntity.badRequest().body(ApiResponse.error("User not found"));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "UserNotFoundException");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("User not found", errorData));
         } catch (IllegalStateException e) {
             log.error("Configuration error: {}", e.getMessage(), e);
-            return ResponseEntity.badRequest().body(ApiResponse.error("Configuration error: " + e.getMessage()));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "ConfigurationError");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("Configuration error: " + e.getMessage(), errorData));
         } catch (software.amazon.awssdk.core.exception.SdkClientException e) {
             log.error("AWS SDK client error: {}", e.getMessage(), e);
-            return ResponseEntity.badRequest().body(ApiResponse.error("AWS credentials error. Please contact support."));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "AwsCredentialsError");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("AWS credentials error. Please contact support.", errorData));
         } catch (Exception e) {
             log.error("Error confirming forgot password: {}", request.getEmail(), e);
-            return ResponseEntity.badRequest().body(ApiResponse.error("Error confirming forgot password: " + e.getMessage()));
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "UnexpectedException");
+            errorData.put("errorMessage", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("Error confirming forgot password: " + e.getMessage(), errorData));
         }
     }
 }

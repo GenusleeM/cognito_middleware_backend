@@ -9,8 +9,7 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminCreateUserResponse;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.UserType;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.SignUpResponse;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -55,13 +54,9 @@ public class AuthControllerTest {
         request.setAttributes(attributes);
         
         // Mock the service response
-        UserType userType = UserType.builder()
-                .username("test@example.com")
-                .userStatus("CONFIRMED")
-                .build();
-        
-        AdminCreateUserResponse mockResponse = AdminCreateUserResponse.builder()
-                .user(userType)
+        SignUpResponse mockResponse = SignUpResponse.builder()
+                .userSub("test-user-sub-123")
+                .userConfirmed(false)
                 .build();
         
         when(cognitoService.registerUser(anyString(), anyString(), any())).thenReturn(mockResponse);

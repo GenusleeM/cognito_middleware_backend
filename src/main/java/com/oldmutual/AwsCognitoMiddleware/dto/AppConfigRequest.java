@@ -21,6 +21,6 @@ public class AppConfigRequest {
     @NotBlank(message = "Client ID is required")
     private String clientId;
     
-    @NotBlank(message = "Client secret is required")
+    // Client secret is optional as some Cognito operations only require userPoolId and clientId
     private String clientSecret;
 }

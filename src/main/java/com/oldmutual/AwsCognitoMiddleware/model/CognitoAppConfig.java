@@ -41,8 +41,9 @@ public class CognitoAppConfig {
     /**
      * Client secret is stored encrypted in the database.
      * Jasypt is used for encryption/decryption.
+     * This field is optional as some Cognito operations only require userPoolId and clientId.
      */
-    @Column(nullable = false)
+    @Column(nullable = true)
     @Convert(converter = AttributeEncryptor.class)
     private String clientSecret;
     
