@@ -12,6 +12,7 @@ import com.oldmutual.AwsCognitoMiddleware.dto.AssociateSoftwareTokenRequest;
 import com.oldmutual.AwsCognitoMiddleware.dto.VerifySoftwareTokenRequest;
 import com.oldmutual.AwsCognitoMiddleware.dto.ResendOtpRequest;
 import com.oldmutual.AwsCognitoMiddleware.dto.TokenIntrospectRequest;
+import com.oldmutual.AwsCognitoMiddleware.dto.ChangePasswordRequest;
 import com.oldmutual.AwsCognitoMiddleware.service.CognitoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,9 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.UsernameExi
 import software.amazon.awssdk.services.cognitoidentityprovider.model.ChallengeNameType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.ResendConfirmationCodeResponse;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.ExpiredCodeException;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.InvalidParameterException;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.InvalidPasswordException;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.LimitExceededException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -348,6 +352,20 @@ public class AuthController {
             String cleanMsg = cleanErrorMessage(e.getMessage());
             errorData.put("errorMessage", cleanMsg);
             return ResponseEntity.badRequest().body(ApiResponse.error("Configuration error: " + e.getMessage(), errorData));
+        } catch (software.amazon.awssdk.services.cognitoidentityprovider.model.InvalidParameterException e) {
+            log.error("Invalid parameter for forgot password: {}", request.getEmail(), e);
+            String cleanMsg = cleanErrorMessage(e.getMessage());
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "InvalidParameterException");
+            errorData.put("errorMessage", cleanMsg);
+
+            // Check if it's the email verification issue
+            if (cleanMsg != null && cleanMsg.toLowerCase().contains("no registered/verified email")) {
+                return ResponseEntity.badRequest().body(ApiResponse.error(
+                    "User email is not verified. Please verify your email first or contact support.", errorData));
+            }
+
+            return ResponseEntity.badRequest().body(ApiResponse.error(cleanMsg, errorData));
         } catch (software.amazon.awssdk.core.exception.SdkClientException e) {
             log.error("AWS SDK client error: {}", e.getMessage(), e);
             Map<String, Object> errorData = new HashMap<>();
@@ -361,7 +379,7 @@ public class AuthController {
             errorData.put("errorType", "UnexpectedException");
             String cleanMsg = cleanErrorMessage(e.getMessage());
             errorData.put("errorMessage", cleanMsg);
-            return ResponseEntity.badRequest().body(ApiResponse.error("Error initiating forgot password: " + e.getMessage(), errorData));
+            return ResponseEntity.badRequest().body(ApiResponse.error("Error initiating forgot password: " + cleanMsg, errorData));
         }
     }
 
@@ -645,6 +663,70 @@ public class AuthController {
             errorData.put("errorType", "UnexpectedException");
             errorData.put("errorMessage", cleanMessage);
             return ResponseEntity.badRequest().body(ApiResponse.error("Error introspecting token: " + cleanMessage, errorData));
+        }
+    }
+
+    /**
+     * Change password for an authenticated user.
+     *
+     * @param request The change password request
+     * @return The change password response
+     */
+    @PostMapping("/change-password")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        log.info("Received change password request");
+        try {
+            cognitoService.changePassword(
+                    request.getAccessToken(),
+                    request.getPreviousPassword(),
+                    request.getProposedPassword()
+            );
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("message", "Password changed successfully");
+
+            return ResponseEntity.ok(ApiResponse.success(data, "Password changed successfully"));
+        } catch (NotAuthorizedException e) {
+            log.error("Unauthorized password change attempt", e);
+            String cleanMessage = cleanErrorMessage(e.getMessage());
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "NotAuthorizedException");
+            errorData.put("errorMessage", cleanMessage);
+
+            // Check if it's invalid previous password
+            if (cleanMessage != null && cleanMessage.toLowerCase().contains("incorrect username or password")) {
+                return ResponseEntity.status(401).body(ApiResponse.error("Previous password is incorrect", errorData));
+            }
+
+            return ResponseEntity.status(401).body(ApiResponse.error("Invalid or expired access token", errorData));
+        } catch (InvalidPasswordException e) {
+            log.error("Invalid new password", e);
+            String cleanMessage = cleanErrorMessage(e.getMessage());
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "InvalidPasswordException");
+            errorData.put("errorMessage", cleanMessage);
+            return ResponseEntity.badRequest().body(ApiResponse.error("New password does not meet requirements: " + cleanMessage, errorData));
+        } catch (LimitExceededException e) {
+            log.error("Limit exceeded for password change", e);
+            String cleanMessage = cleanErrorMessage(e.getMessage());
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "LimitExceededException");
+            errorData.put("errorMessage", cleanMessage);
+            return ResponseEntity.status(429).body(ApiResponse.error("Attempt limit exceeded. Please try again later.", errorData));
+        } catch (IllegalStateException e) {
+            log.error("Configuration error: {}", e.getMessage(), e);
+            String cleanMessage = cleanErrorMessage(e.getMessage());
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "ConfigurationError");
+            errorData.put("errorMessage", cleanMessage);
+            return ResponseEntity.badRequest().body(ApiResponse.error("Configuration error: " + cleanMessage, errorData));
+        } catch (Exception e) {
+            log.error("Error changing password", e);
+            String cleanMessage = cleanErrorMessage(e.getMessage());
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("errorType", "UnexpectedException");
+            errorData.put("errorMessage", cleanMessage);
+            return ResponseEntity.badRequest().body(ApiResponse.error("Error changing password: " + cleanMessage, errorData));
         }
     }
 }

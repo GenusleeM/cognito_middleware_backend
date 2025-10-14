@@ -854,4 +854,86 @@ public class CognitoService {
             cognitoClient.close();
         }
     }
+
+    /**
+     * Change password for an authenticated user.
+     *
+     * @param accessToken The access token of the authenticated user
+     * @param previousPassword The current password
+     * @param proposedPassword The new password
+     * @return ChangePasswordResponse
+     * @throws NotAuthorizedException if the access token is invalid or the previous password is incorrect
+     * @throws InvalidPasswordException if the new password doesn't meet requirements
+     * @throws LimitExceededException if attempt limit exceeded
+     * @throws IllegalStateException if the Cognito configuration is not found
+     */
+    public software.amazon.awssdk.services.cognitoidentityprovider.model.ChangePasswordResponse changePassword(
+            String accessToken, String previousPassword, String proposedPassword) {
+        log.info("Changing password for authenticated user");
+        CognitoAppConfig appConfig = getCurrentAppConfig();
+        CognitoIdentityProviderClient cognitoClient = createCognitoClient();
+        HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+        String username = null;
+
+        try {
+            // Get user info to log the username
+            try {
+                GetUserRequest getUserRequest = GetUserRequest.builder()
+                        .accessToken(accessToken)
+                        .build();
+                var userResponse = cognitoClient.getUser(getUserRequest);
+                username = userResponse.username();
+            } catch (Exception e) {
+                log.warn("Could not retrieve username from token", e);
+            }
+
+            software.amazon.awssdk.services.cognitoidentityprovider.model.ChangePasswordRequest changePasswordRequest =
+                    software.amazon.awssdk.services.cognitoidentityprovider.model.ChangePasswordRequest.builder()
+                            .accessToken(accessToken)
+                            .previousPassword(previousPassword)
+                            .proposedPassword(proposedPassword)
+                            .build();
+
+            var response = cognitoClient.changePassword(changePasswordRequest);
+
+            log.info("Password changed successfully for user: {}", username);
+
+            // Log successful password change
+            userActivityLogService.logActivity(
+                    appConfig.getUserPoolId(),
+                    username != null ? username : "UNKNOWN",
+                    "CHANGE_PASSWORD",
+                    appConfig.getAppName(),
+                    "SUCCESS",
+                    null,
+                    request
+            );
+
+            return response;
+
+        } catch (Exception ex) {
+            log.error("Error changing password", ex);
+
+            String errorMessage = ex.getMessage();
+            if (errorMessage != null && errorMessage.contains("(Service:")) {
+                errorMessage = errorMessage.substring(0, errorMessage.indexOf("(Service:")).trim();
+            }
+
+            // Log failed password change
+            userActivityLogService.logActivity(
+                    appConfig.getUserPoolId(),
+                    username != null ? username : "UNKNOWN",
+                    "CHANGE_PASSWORD",
+                    appConfig.getAppName(),
+                    "FAILURE",
+                    errorMessage,
+                    request
+            );
+
+            throw ex;
+
+        } finally {
+            cognitoClient.close();
+        }
+    }
 }
