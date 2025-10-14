@@ -28,6 +28,8 @@ public class CognitoService {
 
     private static final String APP_CONFIG_ATTRIBUTE = "appConfig";
     private static final String AUTH_FLOW = "USER_PASSWORD_AUTH";
+    
+    private final UserActivityLogService userActivityLogService;
 
     /**
      * Get the current request's Cognito configuration.
@@ -81,6 +83,8 @@ public class CognitoService {
         log.debug("Using app config: {}", appConfig.getAppName());
         CognitoIdentityProviderClient cognitoClient = createCognitoClient();
         
+        HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+        
         try {
             // Create a list to hold all user attributes
             java.util.List<AttributeType> userAttributes = new java.util.ArrayList<>();
@@ -111,9 +115,41 @@ public class CognitoService {
                     .userAttributes(userAttributes)
                     .build();
             
-             var  me = cognitoClient.signUp(signUpRequest);
-             log.info(me.toString());
-             return me;
+            try {
+                var response = cognitoClient.signUp(signUpRequest);
+                log.info("User registration successful: {}", response);
+                
+                // Log successful registration
+                userActivityLogService.logActivity(
+                    "REGISTER",
+                    email,
+                    appConfig.getUserPoolId(),
+                    appConfig.getAppName(),
+                    "SUCCESS",
+                    null,
+                    request
+                );
+                
+                return response;
+            } catch (CognitoIdentityProviderException ex) {
+                String errorMessage = ex.getMessage();
+                if (errorMessage.contains("(Service:")) {
+                    errorMessage = errorMessage.substring(0, errorMessage.indexOf("(Service:"));
+                }
+                
+                // Log failed registration
+                userActivityLogService.logActivity(
+                    "REGISTER",
+                    email,
+                    appConfig.getUserPoolId(),
+                    appConfig.getAppName(),
+                    "FAILURE",
+                    errorMessage,
+                    request
+                );
+                
+                throw ex;
+            }
         } finally {
             cognitoClient.close();
         }
@@ -132,6 +168,8 @@ public class CognitoService {
         log.debug("Using app config: {}", appConfig.getAppName());
         CognitoIdentityProviderClient cognitoClient = createCognitoClient();
         
+        HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+        
         try {
             ConfirmSignUpRequest confirmSignUpRequest = ConfirmSignUpRequest.builder()
                     .clientId(appConfig.getClientId())
@@ -139,7 +177,41 @@ public class CognitoService {
                     .confirmationCode(confirmationCode)
                     .build();
             
-            return cognitoClient.confirmSignUp(confirmSignUpRequest);
+            try {
+                var response = cognitoClient.confirmSignUp(confirmSignUpRequest);
+                log.info("User verification successful for: {}", email);
+                
+                // Log successful verification
+                userActivityLogService.logActivity(
+                    "VERIFY",
+                    email,
+                    appConfig.getUserPoolId(),
+                    appConfig.getAppName(),
+                    "SUCCESS",
+                    null,
+                    request
+                );
+                
+                return response;
+            } catch (CognitoIdentityProviderException ex) {
+                String errorMessage = ex.getMessage();
+                if (errorMessage.contains("(Service:")) {
+                    errorMessage = errorMessage.substring(0, errorMessage.indexOf("(Service:"));
+                }
+                
+                // Log failed verification
+                userActivityLogService.logActivity(
+                    "VERIFY",
+                    email,
+                    appConfig.getUserPoolId(),
+                    appConfig.getAppName(),
+                    "FAILURE",
+                    errorMessage,
+                    request
+                );
+                
+                throw ex;
+            }
         } finally {
             cognitoClient.close();
         }
@@ -158,6 +230,8 @@ public class CognitoService {
         log.debug("Using app config: {}", appConfig.getAppName());
         CognitoIdentityProviderClient cognitoClient = createCognitoClient();
         
+        HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+        
         try {
             Map<String, String> authParams = new HashMap<>();
             authParams.put("USERNAME", email);
@@ -169,7 +243,41 @@ public class CognitoService {
                     .authParameters(authParams)
                     .build();
             
-            return cognitoClient.initiateAuth(authRequest);
+            try {
+                var response = cognitoClient.initiateAuth(authRequest);
+                log.info("User authentication successful for: {}", email);
+                
+                // Log successful login
+                userActivityLogService.logActivity(
+                    "LOGIN",
+                    email,
+                    appConfig.getUserPoolId(),
+                    appConfig.getAppName(),
+                    "SUCCESS",
+                    null,
+                    request
+                );
+                
+                return response;
+            } catch (CognitoIdentityProviderException ex) {
+                String errorMessage = ex.getMessage();
+                if (errorMessage.contains("(Service:")) {
+                    errorMessage = errorMessage.substring(0, errorMessage.indexOf("(Service:"));
+                }
+                
+                // Log failed login
+                userActivityLogService.logActivity(
+                    "LOGIN",
+                    email,
+                    appConfig.getUserPoolId(),
+                    appConfig.getAppName(),
+                    "FAILURE",
+                    errorMessage,
+                    request
+                );
+                
+                throw ex;
+            }
         } finally {
             cognitoClient.close();
         }
@@ -187,13 +295,49 @@ public class CognitoService {
         log.debug("Using app config: {}", appConfig.getAppName());
         CognitoIdentityProviderClient cognitoClient = createCognitoClient();
         
+        HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+        
         try {
             ForgotPasswordRequest forgotPasswordRequest = ForgotPasswordRequest.builder()
                     .clientId(appConfig.getClientId())
                     .username(email)
                     .build();
             
-            return cognitoClient.forgotPassword(forgotPasswordRequest);
+            try {
+                var response = cognitoClient.forgotPassword(forgotPasswordRequest);
+                log.info("Forgot password request successful for: {}", email);
+                
+                // Log successful forgot password request
+                userActivityLogService.logActivity(
+                    "FORGOT_PASSWORD_REQUEST",
+                    email,
+                    appConfig.getUserPoolId(),
+                    appConfig.getAppName(),
+                    "SUCCESS",
+                    null,
+                    request
+                );
+                
+                return response;
+            } catch (CognitoIdentityProviderException ex) {
+                String errorMessage = ex.getMessage();
+                if (errorMessage.contains("(Service:")) {
+                    errorMessage = errorMessage.substring(0, errorMessage.indexOf("(Service:"));
+                }
+                
+                // Log failed forgot password request
+                userActivityLogService.logActivity(
+                    "FORGOT_PASSWORD_REQUEST",
+                    email,
+                    appConfig.getUserPoolId(),
+                    appConfig.getAppName(),
+                    "FAILURE",
+                    errorMessage,
+                    request
+                );
+                
+                throw ex;
+            }
         } finally {
             cognitoClient.close();
         }
@@ -212,7 +356,9 @@ public class CognitoService {
         CognitoAppConfig appConfig = getCurrentAppConfig();
         log.debug("Using app config: {}", appConfig.getAppName());
         CognitoIdentityProviderClient cognitoClient = createCognitoClient();
-        
+
+        HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+
         try {
             ConfirmForgotPasswordRequest confirmRequest = ConfirmForgotPasswordRequest.builder()
                     .clientId(appConfig.getClientId())
@@ -220,8 +366,490 @@ public class CognitoService {
                     .confirmationCode(confirmationCode)
                     .password(newPassword)
                     .build();
-            
-            return cognitoClient.confirmForgotPassword(confirmRequest);
+
+            try {
+                var response = cognitoClient.confirmForgotPassword(confirmRequest);
+                log.info("Password reset confirmation successful for: {}", email);
+
+                // Log successful password reset
+                userActivityLogService.logActivity(
+                    "RESET_PASSWORD",
+                    email,
+                    appConfig.getUserPoolId(),
+                    appConfig.getAppName(),
+                    "SUCCESS",
+                    null,
+                    request
+                );
+
+                return response;
+            } catch (CognitoIdentityProviderException ex) {
+                String errorMessage = ex.getMessage();
+                if (errorMessage.contains("(Service:")) {
+                    errorMessage = errorMessage.substring(0, errorMessage.indexOf("(Service:"));
+                }
+
+                // Log failed password reset
+                userActivityLogService.logActivity(
+                    "RESET_PASSWORD",
+                    email,
+                    appConfig.getUserPoolId(),
+                    appConfig.getAppName(),
+                    "FAILURE",
+                    errorMessage,
+                    request
+                );
+
+                throw ex;
+            }
+        } finally {
+            cognitoClient.close();
+        }
+    }
+
+    /**
+     * Set user MFA preference (SMS or SOFTWARE_TOKEN_MFA).
+     *
+     * @param accessToken The user's access token
+     * @param mfaType     The MFA type (SMS_MFA or SOFTWARE_TOKEN_MFA)
+     * @param phoneNumber The phone number for SMS MFA (optional)
+     */
+    public void setUserMfaPreference(String accessToken, String mfaType, String phoneNumber) {
+        log.info("Setting user MFA preference to: {}", mfaType);
+        CognitoAppConfig appConfig = getCurrentAppConfig();
+        log.debug("Using app config: {}", appConfig.getAppName());
+        CognitoIdentityProviderClient cognitoClient = createCognitoClient();
+
+        HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+
+        try {
+            SetUserMfaPreferenceRequest.Builder requestBuilder = SetUserMfaPreferenceRequest.builder()
+                    .accessToken(accessToken);
+
+            if ("SMS_MFA".equals(mfaType)) {
+                // Set SMS MFA as preferred
+                requestBuilder.smsMfaSettings(SMSMfaSettingsType.builder()
+                        .enabled(true)
+                        .preferredMfa(true)
+                        .build());
+
+                // Update phone number if provided
+                if (phoneNumber != null && !phoneNumber.isEmpty()) {
+                    updateUserPhoneNumber(accessToken, phoneNumber);
+                }
+            } else if ("SOFTWARE_TOKEN_MFA".equals(mfaType)) {
+                // Set Software Token MFA as preferred
+                requestBuilder.softwareTokenMfaSettings(SoftwareTokenMfaSettingsType.builder()
+                        .enabled(true)
+                        .preferredMfa(true)
+                        .build());
+            }
+
+            try {
+                cognitoClient.setUserMFAPreference(requestBuilder.build());
+                log.info("MFA preference set successfully");
+
+                // Log successful MFA setup
+                userActivityLogService.logActivity(
+                    "MFA_SETUP",
+                    "user",
+                    appConfig.getUserPoolId(),
+                    appConfig.getAppName(),
+                    "SUCCESS",
+                    "MFA type: " + mfaType,
+                    request
+                );
+            } catch (CognitoIdentityProviderException ex) {
+                String errorMessage = ex.getMessage();
+                if (errorMessage.contains("(Service:")) {
+                    errorMessage = errorMessage.substring(0, errorMessage.indexOf("(Service:"));
+                }
+
+                // Log failed MFA setup
+                userActivityLogService.logActivity(
+                    "MFA_SETUP",
+                    "user",
+                    appConfig.getUserPoolId(),
+                    appConfig.getAppName(),
+                    "FAILURE",
+                    errorMessage,
+                    request
+                );
+
+                throw ex;
+            }
+        } finally {
+            cognitoClient.close();
+        }
+    }
+
+    /**
+     * Update user's phone number attribute.
+     *
+     * @param accessToken The user's access token
+     * @param phoneNumber The phone number to set
+     */
+    private void updateUserPhoneNumber(String accessToken, String phoneNumber) {
+        log.info("Updating user phone number");
+        CognitoIdentityProviderClient cognitoClient = createCognitoClient();
+
+        try {
+            UpdateUserAttributesRequest updateRequest = UpdateUserAttributesRequest.builder()
+                    .accessToken(accessToken)
+                    .userAttributes(AttributeType.builder()
+                            .name("phone_number")
+                            .value(phoneNumber)
+                            .build())
+                    .build();
+
+            cognitoClient.updateUserAttributes(updateRequest);
+            log.info("Phone number updated successfully");
+        } finally {
+            cognitoClient.close();
+        }
+    }
+
+    /**
+     * Associate software token for TOTP MFA.
+     *
+     * @param accessToken The user's access token
+     * @return The associate software token response containing the secret code
+     */
+    public AssociateSoftwareTokenResponse associateSoftwareToken(String accessToken) {
+        log.info("Associating software token for MFA");
+        CognitoAppConfig appConfig = getCurrentAppConfig();
+        log.debug("Using app config: {}", appConfig.getAppName());
+        CognitoIdentityProviderClient cognitoClient = createCognitoClient();
+
+        HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+
+        try {
+            AssociateSoftwareTokenRequest tokenRequest = AssociateSoftwareTokenRequest.builder()
+                    .accessToken(accessToken)
+                    .build();
+
+            try {
+                var response = cognitoClient.associateSoftwareToken(tokenRequest);
+                log.info("Software token associated successfully");
+
+                // Log successful token association
+                userActivityLogService.logActivity(
+                    "MFA_TOKEN_ASSOCIATE",
+                    "user",
+                    appConfig.getUserPoolId(),
+                    appConfig.getAppName(),
+                    "SUCCESS",
+                    null,
+                    request
+                );
+
+                return response;
+            } catch (CognitoIdentityProviderException ex) {
+                String errorMessage = ex.getMessage();
+                if (errorMessage.contains("(Service:")) {
+                    errorMessage = errorMessage.substring(0, errorMessage.indexOf("(Service:"));
+                }
+
+                // Log failed token association
+                userActivityLogService.logActivity(
+                    "MFA_TOKEN_ASSOCIATE",
+                    "user",
+                    appConfig.getUserPoolId(),
+                    appConfig.getAppName(),
+                    "FAILURE",
+                    errorMessage,
+                    request
+                );
+
+                throw ex;
+            }
+        } finally {
+            cognitoClient.close();
+        }
+    }
+
+    /**
+     * Verify software token for TOTP MFA.
+     *
+     * @param accessToken The user's access token
+     * @param userCode    The TOTP code from the authenticator app
+     * @param deviceName  The friendly name for the device
+     * @return The verify software token response
+     */
+    public VerifySoftwareTokenResponse verifySoftwareToken(String accessToken, String userCode, String deviceName) {
+        log.info("Verifying software token for MFA");
+        CognitoAppConfig appConfig = getCurrentAppConfig();
+        log.debug("Using app config: {}", appConfig.getAppName());
+        CognitoIdentityProviderClient cognitoClient = createCognitoClient();
+
+        HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+
+        try {
+            VerifySoftwareTokenRequest verifyRequest = VerifySoftwareTokenRequest.builder()
+                    .accessToken(accessToken)
+                    .userCode(userCode)
+                    .friendlyDeviceName(deviceName)
+                    .build();
+
+            try {
+                var response = cognitoClient.verifySoftwareToken(verifyRequest);
+                log.info("Software token verified successfully");
+
+                // Log successful token verification
+                userActivityLogService.logActivity(
+                    "MFA_TOKEN_VERIFY",
+                    "user",
+                    appConfig.getUserPoolId(),
+                    appConfig.getAppName(),
+                    "SUCCESS",
+                    null,
+                    request
+                );
+
+                return response;
+            } catch (CognitoIdentityProviderException ex) {
+                String errorMessage = ex.getMessage();
+                if (errorMessage.contains("(Service:")) {
+                    errorMessage = errorMessage.substring(0, errorMessage.indexOf("(Service:"));
+                }
+
+                // Log failed token verification
+                userActivityLogService.logActivity(
+                    "MFA_TOKEN_VERIFY",
+                    "user",
+                    appConfig.getUserPoolId(),
+                    appConfig.getAppName(),
+                    "FAILURE",
+                    errorMessage,
+                    request
+                );
+
+                throw ex;
+            }
+        } finally {
+            cognitoClient.close();
+        }
+    }
+
+    /**
+     * Respond to MFA challenge during authentication.
+     *
+     * @param email         The user's email
+     * @param session       The session from the initial auth response
+     * @param mfaCode       The MFA code received via SMS or generated by TOTP
+     * @param challengeName The challenge name (SMS_MFA or SOFTWARE_TOKEN_MFA)
+     * @return The authentication result with tokens
+     */
+    public RespondToAuthChallengeResponse respondToMfaChallenge(String email, String session, String mfaCode, String challengeName) {
+        log.info("Responding to MFA challenge for user: {}", email);
+        CognitoAppConfig appConfig = getCurrentAppConfig();
+        log.debug("Using app config: {}", appConfig.getAppName());
+        CognitoIdentityProviderClient cognitoClient = createCognitoClient();
+
+        HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+
+        try {
+            Map<String, String> challengeResponses = new HashMap<>();
+            challengeResponses.put("USERNAME", email);
+
+            if ("SMS_MFA".equals(challengeName)) {
+                challengeResponses.put("SMS_MFA_CODE", mfaCode);
+            } else if ("SOFTWARE_TOKEN_MFA".equals(challengeName)) {
+                challengeResponses.put("SOFTWARE_TOKEN_MFA_CODE", mfaCode);
+            } else if ("EMAIL_OTP".equals(challengeName)) {
+                challengeResponses.put("EMAIL_OTP_CODE", mfaCode);
+            } else {
+                log.warn("Unknown challenge name: {}. Using default code parameter.", challengeName);
+                challengeResponses.put("ANSWER", mfaCode);
+            }
+
+            RespondToAuthChallengeRequest challengeRequest = RespondToAuthChallengeRequest.builder()
+                    .clientId(appConfig.getClientId())
+                    .challengeName(ChallengeNameType.fromValue(challengeName))
+                    .session(session)
+                    .challengeResponses(challengeResponses)
+                    .build();
+
+            try {
+                var response = cognitoClient.respondToAuthChallenge(challengeRequest);
+                log.info("MFA challenge response successful for: {}", email);
+
+                // Log successful MFA verification
+                userActivityLogService.logActivity(
+                    "MFA_VERIFY",
+                    email,
+                    appConfig.getUserPoolId(),
+                    appConfig.getAppName(),
+                    "SUCCESS",
+                    "Challenge: " + challengeName,
+                    request
+                );
+
+                return response;
+            } catch (CognitoIdentityProviderException ex) {
+                String errorMessage = ex.getMessage();
+                if (errorMessage.contains("(Service:")) {
+                    errorMessage = errorMessage.substring(0, errorMessage.indexOf("(Service:"));
+                }
+
+                // Log failed MFA verification
+                userActivityLogService.logActivity(
+                    "MFA_VERIFY",
+                    email,
+                    appConfig.getUserPoolId(),
+                    appConfig.getAppName(),
+                    "FAILURE",
+                    errorMessage,
+                    request
+                );
+
+                throw ex;
+            }
+        } finally {
+            cognitoClient.close();
+        }
+    }
+
+    /**
+     * Resend confirmation code to user's email.
+     *
+     * @param email The user's email
+     * @return The result of the resend confirmation code request
+     */
+    public ResendConfirmationCodeResponse resendConfirmationCode(String email) {
+        log.info("Resending confirmation code for user with email: {}", email);
+        CognitoAppConfig appConfig = getCurrentAppConfig();
+        log.debug("Using app config: {}", appConfig.getAppName());
+        CognitoIdentityProviderClient cognitoClient = createCognitoClient();
+
+        HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+
+        try {
+            ResendConfirmationCodeRequest resendRequest = ResendConfirmationCodeRequest.builder()
+                    .clientId(appConfig.getClientId())
+                    .username(email)
+                    .build();
+
+            try {
+                var response = cognitoClient.resendConfirmationCode(resendRequest);
+                log.info("Confirmation code resent successfully for: {}", email);
+
+                // Log successful OTP resend
+                userActivityLogService.logActivity(
+                    "RESEND_OTP",
+                    email,
+                    appConfig.getUserPoolId(),
+                    appConfig.getAppName(),
+                    "SUCCESS",
+                    null,
+                    request
+                );
+
+                return response;
+            } catch (CognitoIdentityProviderException ex) {
+                String errorMessage = ex.getMessage();
+                if (errorMessage.contains("(Service:")) {
+                    errorMessage = errorMessage.substring(0, errorMessage.indexOf("(Service:"));
+                }
+
+                // Log failed OTP resend
+                userActivityLogService.logActivity(
+                    "RESEND_OTP",
+                    email,
+                    appConfig.getUserPoolId(),
+                    appConfig.getAppName(),
+                    "FAILURE",
+                    errorMessage,
+                    request
+                );
+
+                throw ex;
+            }
+        } finally {
+            cognitoClient.close();
+        }
+    }
+
+    /**
+     * Introspect an access token to validate it.
+     *
+     * @param accessToken The access token to validate
+     * @return GetUserResponse containing user information if token is valid
+     * @throws NotAuthorizedException if the token is invalid or expired
+     * @throws IllegalStateException if the Cognito configuration is not found
+     */
+    public GetUserResponse introspectToken(String accessToken) {
+        log.info("Introspecting access token");
+        CognitoAppConfig appConfig = getCurrentAppConfig();
+        CognitoIdentityProviderClient cognitoClient = createCognitoClient();
+        HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+        String username = null;
+
+        try {
+            GetUserRequest getUserRequest = GetUserRequest.builder()
+                    .accessToken(accessToken)
+                    .build();
+
+            var response = cognitoClient.getUser(getUserRequest);
+            username = response.username();
+
+            log.info("Token validated successfully for user: {}", username);
+
+            // Log successful introspection
+            userActivityLogService.logActivity(
+                    appConfig.getUserPoolId(),
+                    username,
+                    "TOKEN_INTROSPECT",
+                    appConfig.getAppName(),
+                    "SUCCESS",
+                    null,
+                    request
+            );
+
+            return response;
+
+        } catch (NotAuthorizedException ex) {
+            log.error("Token validation failed - invalid or expired token", ex);
+
+            String errorMessage = ex.getMessage();
+            if (errorMessage != null && errorMessage.contains("(Service:")) {
+                errorMessage = errorMessage.substring(0, errorMessage.indexOf("(Service:")).trim();
+            }
+
+            // Log failed introspection
+            userActivityLogService.logActivity(
+                    appConfig.getUserPoolId(),
+                    username != null ? username : "UNKNOWN",
+                    "TOKEN_INTROSPECT",
+                    appConfig.getAppName(),
+                    "FAILURE",
+                    errorMessage,
+                    request
+            );
+
+            throw ex;
+
+        } catch (Exception ex) {
+            log.error("Error during token introspection", ex);
+
+            String errorMessage = ex.getMessage();
+            if (errorMessage != null && errorMessage.contains("(Service:")) {
+                errorMessage = errorMessage.substring(0, errorMessage.indexOf("(Service:")).trim();
+            }
+
+            // Log failed introspection
+            userActivityLogService.logActivity(
+                    appConfig.getUserPoolId(),
+                    username != null ? username : "UNKNOWN",
+                    "TOKEN_INTROSPECT",
+                    appConfig.getAppName(),
+                    "FAILURE",
+                    errorMessage,
+                    request
+            );
+
+            throw ex;
+
         } finally {
             cognitoClient.close();
         }

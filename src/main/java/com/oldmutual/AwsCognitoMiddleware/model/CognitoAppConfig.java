@@ -43,7 +43,7 @@ public class CognitoAppConfig {
      * Jasypt is used for encryption/decryption.
      * This field is optional as some Cognito operations only require userPoolId and clientId.
      */
-    @Column(nullable = true)
+
     @Convert(converter = AttributeEncryptor.class)
     private String clientSecret;
     

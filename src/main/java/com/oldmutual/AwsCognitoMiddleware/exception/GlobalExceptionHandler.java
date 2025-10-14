@@ -73,9 +73,39 @@ public class GlobalExceptionHandler {
      * @return A response with the Cognito error details
      */
     @ExceptionHandler(CognitoIdentityProviderException.class)
-    public ResponseEntity<ApiResponse<Void>> handleCognitoException(CognitoIdentityProviderException ex) {
-        log.error("Cognito error: {}", ex.getMessage());
-        return ResponseEntity.badRequest().body(ApiResponse.error("Cognito error: " + ex.getMessage()));
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleCognitoException(CognitoIdentityProviderException ex) {
+        String fullErrorMessage = ex.getMessage();
+        log.error("Cognito error: {}", fullErrorMessage);
+        
+        // Extract the core error message without AWS service details
+        String cleanErrorMessage = extractCleanErrorMessage(fullErrorMessage);
+        
+        Map<String, String> errorData = new HashMap<>();
+        errorData.put("errorType", ex.getClass().getSimpleName());
+        errorData.put("errorMessage", cleanErrorMessage);
+        
+        return ResponseEntity.badRequest().body(ApiResponse.error("Invalid credentials", errorData));
+    }
+    
+    /**
+     * Extracts the clean error message from the full AWS error message.
+     * Removes the AWS service details in parentheses.
+     *
+     * @param fullErrorMessage The full error message from AWS
+     * @return The clean error message without AWS service details
+     */
+    private String extractCleanErrorMessage(String fullErrorMessage) {
+        if (fullErrorMessage == null) {
+            return "Unknown error";
+        }
+        
+        // Extract the message before the AWS service details
+        int serviceIndex = fullErrorMessage.indexOf(" (Service:");
+        if (serviceIndex > 0) {
+            return fullErrorMessage.substring(0, serviceIndex);
+        }
+        
+        return fullErrorMessage;
     }
 
     /**
